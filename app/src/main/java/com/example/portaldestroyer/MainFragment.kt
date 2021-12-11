@@ -16,25 +16,27 @@ import com.google.ar.sceneform.SceneView
 import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.rendering.ModelRenderable
 import com.google.ar.sceneform.rendering.Renderable
-import com.google.ar.sceneform.rendering.ViewRenderable
 import com.google.ar.sceneform.ux.ArFragment
 import com.gorisse.thomas.sceneform.scene.await
 
 
 class MainFragment : Fragment(R.layout.fragment_main) {
 
-    private var portalCount = 0
-    private val maxPortalCount = 4
     private lateinit var arFragment: ArFragment
     private val arSceneView get() = arFragment.arSceneView
     private val scene get() = arSceneView.scene
     private val camera get() = scene.camera
-    private val ballAsset: String = "https://drive.google.com/uc?export=download&id=1Stbo-zW3crIAzT4LTPOFt3YIuuZVeOsB"
-//    private val ballAsset: String = "models/wormball.glb"
 
-    private var modelBall: Renderable? = null
-    private var modelBallPlaced = false
-    private var modelView: ViewRenderable? = null
+    private val ballAsset: String = "https://drive.google.com/uc?export=download&id=1Stbo-zW3crIAzT4LTPOFt3YIuuZVeOsB"
+    private val portalAsset: String = "https://drive.google.com/uc?export=download&id=1IeCl7_idk_HwzWL62j9mMIRzpdA-qT-h"
+
+    private var portalModel : Renderable? = null
+    private var ballModel: Renderable? = null
+
+    private var ballModelPlaced = false
+    private var portalCount = 0
+    private val maxPortalCount = 4
+    private val maxPortalCountPerPlane: Int = 2
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -65,12 +67,17 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         // Ensure the camera is tracking to avoid errors
         if(frame.camera.trackingState == TrackingState.TRACKING){
-            if(!modelBallPlaced) {
-                attachModelToCamera(modelBall, Vector3(0.1f, 0.1f, 0.1f))
-                modelBallPlaced = true
+            if (ballModel == null) {
+                Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
+            }
+            else if(!ballModelPlaced) {
+
+                attachModelToCamera(ballModel, Vector3(0.1f, 0.1f, 0.1f))
+                ballModelPlaced = true
             }
 
             if(portalCount < maxPortalCount){
+
                 val planes = frame.getUpdatedTrackables(Plane::class.java)
                 putPortalOnPlane(planes, frame)
             }
@@ -85,15 +92,17 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         planes: MutableCollection<Plane>,
         frame: Frame
     ) {
-        // get the first plane, perform hit test and add portal to the scene
-        if(planes.isNotEmpty()){
-            val plane = planes.iterator().next()
-            if (plane.trackingState == TrackingState.TRACKING) {
+        if (portalModel == null) {
+            Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
+        }
+
+        for(plane in planes){
+            if (plane.trackingState == TrackingState.TRACKING && plane.anchors.size < maxPortalCountPerPlane) {
                 val hitTest = frame.hitTest(frame.screenCenter().x, frame.screenCenter().y)
                 if (hitTest.isNotEmpty()) {
                     val hitResult = hitTest.iterator().next()
                     val portalAnchor = plane.createAnchor(hitResult.hitPose)
-                    addModelToScene(modelBall, portalAnchor)
+                    addModelToScene(portalModel, portalAnchor)
                     portalCount += 1
                 }
             }
@@ -113,23 +122,25 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     private suspend fun loadModels() {
-        modelBall = ModelRenderable.builder()
+        ballModel = ModelRenderable.builder()
             .setSource(context, Uri.parse(ballAsset))
             .setIsFilamentGltf(true)
             .await()
-        modelView = ViewRenderable.builder()
-            .setView(context, R.layout.view_renderable_infos)
+        portalModel = ModelRenderable.builder()
+            .setSource(context, Uri.parse(portalAsset))
+            .setIsFilamentGltf(true)
             .await()
+
     }
 
     private fun onTapPlane(hitResult: HitResult, plane: Plane, motionEvent: MotionEvent) {
-        if (modelBall == null || modelView == null) {
+        if (portalModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
             return
         }
 
         // Create the Anchor on a tap position
-        addModelToScene(modelBall, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
+        addModelToScene(portalModel, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
     }
 
     private fun addModelToScene(model: Renderable?, anchor: Anchor?, scale: Vector3 = Vector3(0.05f, 0.05f, 0.05f)) {
