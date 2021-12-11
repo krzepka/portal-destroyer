@@ -42,7 +42,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         super.onViewCreated(view, savedInstanceState)
 
         arFragment = (childFragmentManager.findFragmentById(R.id.arFragment) as ArFragment).apply {
-            setOnSessionConfigurationListener { session, config ->
+            setOnSessionConfigurationListener { _, _ ->
                 // Modify the AR session configuration here
             }
             setOnViewCreatedListener { arSceneView ->
@@ -60,7 +60,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     private fun sceneUpdate(updatedTime: FrameTime){
         // Let the fragment update its state first
-        arFragment.onUpdate(updatedTime);
+        arFragment.onUpdate(updatedTime)
 
         // Stop when no frame
         val frame: Frame = arSceneView.arFrame ?: return
@@ -110,6 +110,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-screen
+    @Suppress("unused")
     private fun Frame.screenCenter(): Vector3 {
         return Vector3(arSceneView.width / 2f, arSceneView.height / 2f, 0f)
     }
@@ -133,6 +134,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun onTapPlane(hitResult: HitResult, plane: Plane, motionEvent: MotionEvent) {
         if (portalModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
