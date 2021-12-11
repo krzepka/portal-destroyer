@@ -2,6 +2,7 @@ package com.example.portaldestroyer
 
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
@@ -28,7 +29,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private val ballAsset: String = "https://drive.google.com/uc?export=download&id=1Stbo-zW3crIAzT4LTPOFt3YIuuZVeOsB"
 
     private var modelBall: Renderable? = null
-    private var modelPlaced = false
+    private var modelBallPlaced = false
     private var modelView: ViewRenderable? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -51,14 +52,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-    private fun createBallAnchor(){
-        val pos = floatArrayOf(0.0f, 0.0f, 1.0f)
-        val rot = floatArrayOf(0.0f, 0.0f, 0.0f, 1.0f)
-
-        val anchor = arSceneView.session?.createAnchor(Pose(pos, rot))
-        createCameraAnchor(modelBall, anchor)
-    }
-
     private fun sceneUpdate(updatedTime: FrameTime){
         // Let the fragment update its state first
         arFragment.onUpdate(updatedTime);
@@ -67,9 +60,18 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         val frame: Frame = arSceneView.arFrame ?: return
 //        val plane = frame.getUpdatedTrackables(Plane::class.java)
 
-        if(!modelPlaced and (frame.camera.trackingState == TrackingState.TRACKING)) {
-            createBallAnchor()
-            modelPlaced = true
+        if(!modelBallPlaced and (frame.camera.trackingState == TrackingState.TRACKING)) {
+            attachModelToCamera(modelBall, Vector3(0.1f, 0.1f, 0.1f))
+            modelBallPlaced = true
+        }
+
+        logCamChildPositions()
+    }
+
+    private fun logCamChildPositions() {
+        Log.d("sceneUpdate", "Camera position: " + camera.worldPosition)
+        for (child in camera.children) {
+            Log.d("sceneUpdate", "Child position: " + child.worldPosition)
         }
     }
 
@@ -90,10 +92,10 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
 
         // Create the Anchor on a tap position
-        createSceneAnchor(modelBall, hitResult.createAnchor())
+        addModelToScene(modelBall, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
     }
 
-    private fun createSceneAnchor(model: Renderable?, anchor: Anchor?, scale: Vector3 = Vector3(0.05f, 0.05f, 0.05f)) {
+    private fun addModelToScene(model: Renderable?, anchor: Anchor?, scale: Vector3 = Vector3(0.05f, 0.05f, 0.05f)) {
         scene.addChild(AnchorNode(anchor).apply {
             // Create the transformable model and add it to the anchor.
             addChild(Node().apply {
@@ -104,15 +106,13 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         })
     }
 
-    private fun createCameraAnchor(model: Renderable?, anchor: Anchor?, scale: Vector3 = Vector3(0.05f, 0.05f, 0.05f)) {
-        camera.addChild(AnchorNode(anchor).apply {
-            // Create the transformable model and add it to the anchor.
-            addChild(Node().apply {
+    private fun attachModelToCamera(model: Renderable?, scale: Vector3 = Vector3(0.1f, 0.1f, 0.1f)) {
+        camera.addChild(Node().apply {
+                localPosition = Vector3(0.0f, -0.4f, -1.0f)
                 localScale = scale
                 renderable = model
                 renderableInstance.animate(true).start()
             })
-        })
     }
 
 }
