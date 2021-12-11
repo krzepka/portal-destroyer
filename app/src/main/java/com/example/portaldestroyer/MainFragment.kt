@@ -20,13 +20,17 @@ import com.google.ar.sceneform.rendering.ViewRenderable
 import com.google.ar.sceneform.ux.ArFragment
 import com.gorisse.thomas.sceneform.scene.await
 
+
 class MainFragment : Fragment(R.layout.fragment_main) {
 
+    private var portalCount = 0
+    private val maxPortalCount = 4
     private lateinit var arFragment: ArFragment
     private val arSceneView get() = arFragment.arSceneView
     private val scene get() = arSceneView.scene
     private val camera get() = scene.camera
     private val ballAsset: String = "https://drive.google.com/uc?export=download&id=1Stbo-zW3crIAzT4LTPOFt3YIuuZVeOsB"
+//    private val ballAsset: String = "models/wormball.glb"
 
     private var modelBall: Renderable? = null
     private var modelBallPlaced = false
@@ -58,14 +62,47 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         // Stop when no frame
         val frame: Frame = arSceneView.arFrame ?: return
-//        val plane = frame.getUpdatedTrackables(Plane::class.java)
 
-        if(!modelBallPlaced and (frame.camera.trackingState == TrackingState.TRACKING)) {
-            attachModelToCamera(modelBall, Vector3(0.1f, 0.1f, 0.1f))
-            modelBallPlaced = true
+        // Ensure the camera is tracking to avoid errors
+        if(frame.camera.trackingState == TrackingState.TRACKING){
+            if(!modelBallPlaced) {
+                attachModelToCamera(modelBall, Vector3(0.1f, 0.1f, 0.1f))
+                modelBallPlaced = true
+            }
+
+            if(portalCount < maxPortalCount){
+                val planes = frame.getUpdatedTrackables(Plane::class.java)
+                putPortalOnPlane(planes, frame)
+            }
         }
 
+
         logCamChildPositions()
+    }
+
+    // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-screen
+    private fun putPortalOnPlane(
+        planes: MutableCollection<Plane>,
+        frame: Frame
+    ) {
+        // get the first plane, perform hit test and add portal to the scene
+        if(planes.isNotEmpty()){
+            val plane = planes.iterator().next()
+            if (plane.trackingState == TrackingState.TRACKING) {
+                val hitTest = frame.hitTest(frame.screenCenter().x, frame.screenCenter().y)
+                if (hitTest.isNotEmpty()) {
+                    val hitResult = hitTest.iterator().next()
+                    val portalAnchor = plane.createAnchor(hitResult.hitPose)
+                    addModelToScene(modelBall, portalAnchor)
+                    portalCount += 1
+                }
+            }
+        }
+    }
+
+    // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-screen
+    private fun Frame.screenCenter(): Vector3 {
+        return Vector3(arSceneView.width / 2f, arSceneView.height / 2f, 0f)
     }
 
     private fun logCamChildPositions() {
@@ -107,6 +144,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     private fun attachModelToCamera(model: Renderable?, scale: Vector3 = Vector3(0.1f, 0.1f, 0.1f)) {
+        // https://stackoverflow.com/questions/59107303/placing-a-static-object-in-the-corner-of-a-screen-with-arcore
         camera.addChild(Node().apply {
                 localPosition = Vector3(0.0f, -0.4f, -1.0f)
                 localScale = scale
