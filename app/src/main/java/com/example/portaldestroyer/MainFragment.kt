@@ -64,8 +64,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         // Stop when no frame
         val frame: Frame = arSceneView.arFrame ?: return
-        val p = frame.androidSensorPose
-        val x = frame.lightEstimate
         frame.acquireCameraImage()
 
         // Ensure the camera is tracking to avoid errors
