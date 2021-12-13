@@ -16,6 +16,7 @@ import com.google.ar.sceneform.SceneView
 import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
+import com.gorisse.thomas.sceneform.light.ambientIntensityEnvironmentLights
 import com.gorisse.thomas.sceneform.scene.await
 
 
@@ -29,20 +30,21 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private lateinit var ballAsset: String
     private lateinit var portalAsset: String
 
-    private var portalModel : Renderable? = null
+    private var portalModel: Renderable? = null
     private var ballModel: Renderable? = null
 
     private var ballModelPlaced = false
     private var portalCount = 0
-    private val maxPortalCount = 4
+    private val maxPortalCount = 20
     private val maxPortalCountPerPlane: Int = 2
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         arFragment = (childFragmentManager.findFragmentById(R.id.arFragment) as ArFragment).apply {
-            setOnSessionConfigurationListener { _, _ ->
-                // Modify the AR session configuration here
+            setOnSessionConfigurationListener { session, config ->
+                // https://developers.google.com/sceneform/develop/lighting-estimation
+                config.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
             }
             setOnViewCreatedListener { arSceneView ->
                 arSceneView.setFrameRateFactor(SceneView.FrameRate.FULL)
@@ -64,33 +66,30 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     private suspend fun loadModels() {
-        createCylinder(Color(0.0f,0.0f,255.0f ))
+        createCylinder(Color(0.0f, 0.0f, 255.0f))
         ballModel = ModelRenderable.builder()
             .setSource(context, Uri.parse(ballAsset))
             .setIsFilamentGltf(true)
             .await()
-//        portalModel = ModelRenderable.builder()
-//            .setSource(context, Uri.parse(portalAsset))
-//            .setIsFilamentGltf(true)
-//            .await()
     }
 
-    private fun createCylinder(color: Color){
+    private fun createCylinder(color: Color) {
         MaterialFactory.makeOpaqueWithColor(arFragment.context, color)
             .thenAccept {
-                portalModel =  ShapeFactory.makeCylinder(2.0f, 0.1f, Vector3(0.0f, 0.0f, 0.0f), it)
+                portalModel = ShapeFactory.makeCylinder(2.0f, 0.1f, Vector3(0.0f, 0.0f, 0.0f), it)
             }
     }
 
-    private fun sceneUpdate(updatedTime: FrameTime){
+    private fun sceneUpdate(updatedTime: FrameTime) {
         // Let the fragment update its state first
         arFragment.onUpdate(updatedTime)
 
         // Stop when no frame
         val frame: Frame = arSceneView.arFrame ?: return
+        Log.i("sceneUpdate", "Intensity: " + frame.lightEstimate.pixelIntensity)
 
         // Ensure the camera is tracking to avoid errors
-        if(frame.camera.trackingState == TrackingState.TRACKING){
+        if (frame.camera.trackingState == TrackingState.TRACKING) {
             placeBallModelOnStart()
             placePortalsOnNewPlanes(frame)
         }
@@ -109,17 +108,17 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     private fun getColorByEstimatePixelIntensity(intensity: Float): Color {
         val color: Color = when {
-            intensity < 50 -> {
-                Color(100.0f, 100.0f, 0.0f)
+            intensity < 0.1f -> {
+                Color(200.0f, 200.0f, 200.0f)
             }
-            intensity < 100 -> {
-                Color(200.0f, 100.0f, 0.0f)
-            }
-            intensity < 150 -> {
+            intensity < 0.2f -> {
                 Color(200.0f, 100.0f, 100.0f)
             }
+            intensity < 0.5f -> {
+                Color(200.0f, 100.0f, 0.0f)
+            }
             else -> {
-                Color(200.0f, 200.0f, 200.0f)
+                Color(100.0f, 100.0f, 0.0f)
             }
         }
         return color
@@ -145,7 +144,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
         }
 
-        for(plane in planes){
+        for (plane in planes) {
             if (plane.trackingState == TrackingState.TRACKING && plane.anchors.size < maxPortalCountPerPlane) {
                 val hitTest = frame.hitTest(frame.screenCenter().x, frame.screenCenter().y)
                 if (hitTest.isNotEmpty()) {
@@ -175,9 +174,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
 
-
-
-
     @Suppress("UNUSED_PARAMETER")
     private fun onTapPlane(hitResult: HitResult, plane: Plane, motionEvent: MotionEvent) {
         if (portalModel == null) {
@@ -196,27 +192,32 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         return newRenderable
     }
 
-    private fun addModelToScene(model: Renderable?, anchor: Anchor?, scale: Vector3 = Vector3(0.05f, 0.05f, 0.05f)) {
-
+    private fun addModelToScene(
+        model: Renderable?,
+        anchor: Anchor?,
+        scale: Vector3 = Vector3(0.05f, 0.05f, 0.05f)
+    ) {
         scene.addChild(AnchorNode(anchor).apply {
             // Create the transformable model and add it to the anchor.
             addChild(Node().apply {
                 localScale = scale
                 renderable = model
                 renderableInstance.animate(true).start()
-
             })
         })
     }
 
-    private fun attachModelToCamera(model: Renderable?, scale: Vector3 = Vector3(0.1f, 0.1f, 0.1f)) {
+    private fun attachModelToCamera(
+        model: Renderable?,
+        scale: Vector3 = Vector3(0.1f, 0.1f, 0.1f)
+    ) {
         // https://stackoverflow.com/questions/59107303/placing-a-static-object-in-the-corner-of-a-screen-with-arcore
         camera.addChild(Node().apply {
-                localPosition = Vector3(0.0f, -0.4f, -1.0f)
-                localScale = scale
-                renderable = model
-                renderableInstance.animate(true).start()
-            })
+            localPosition = Vector3(0.0f, -0.4f, -1.0f)
+            localScale = scale
+            renderable = model
+            renderableInstance.animate(true).start()
+        })
     }
 
 
