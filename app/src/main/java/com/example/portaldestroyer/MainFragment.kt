@@ -27,8 +27,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private val scene get() = arSceneView.scene
     private val camera get() = scene.camera
 
-    private val ballAsset: String = getString(R.string.ballAssetUrl)
-    private val portalAsset: String = getString(R.string.portalAssetUrl)
+    private lateinit var ballAsset: String
+    private lateinit var portalAsset: String
 
     private var portalModel : Renderable? = null
     private var ballModel: Renderable? = null
@@ -40,6 +40,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
 
         arFragment = (childFragmentManager.findFragmentById(R.id.arFragment) as ArFragment).apply {
             setOnSessionConfigurationListener { _, _ ->
@@ -53,9 +54,15 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
 
         lifecycleScope.launchWhenCreated {
+            loadStringAssets()
             loadModels()
             arFragment.arSceneView.scene.addOnUpdateListener(::sceneUpdate)
         }
+    }
+
+    private fun loadStringAssets() {
+        ballAsset = getString(R.string.ballAssetUrl)
+        portalAsset = getString(R.string.ballAssetUrl)
     }
 
     private fun sceneUpdate(updatedTime: FrameTime){
@@ -64,28 +71,32 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         // Stop when no frame
         val frame: Frame = arSceneView.arFrame ?: return
-        frame.acquireCameraImage()
 
         // Ensure the camera is tracking to avoid errors
         if(frame.camera.trackingState == TrackingState.TRACKING){
-            if (ballModel == null) {
-                Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
-            }
-            else if(!ballModelPlaced) {
-
-                attachModelToCamera(ballModel, Vector3(0.1f, 0.1f, 0.1f))
-                ballModelPlaced = true
-            }
-
-            if(portalCount < maxPortalCount){
-
-                val planes = frame.getUpdatedTrackables(Plane::class.java)
-                putPortalOnPlane(planes, frame)
-            }
+            placeBallModelOnStart()
+            placePortalsOnNewPlanes(frame)
         }
 
 
         logCamChildPositions()
+    }
+
+    private fun placePortalsOnNewPlanes(frame: Frame) {
+        if (portalCount < maxPortalCount) {
+            val planes = frame.getUpdatedTrackables(Plane::class.java)
+            putPortalOnPlane(planes, frame)
+        }
+    }
+
+    private fun placeBallModelOnStart() {
+        if (ballModel == null) {
+            Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
+        } else if (!ballModelPlaced) {
+
+            attachModelToCamera(ballModel, Vector3(0.1f, 0.1f, 0.1f))
+            ballModelPlaced = true
+        }
     }
 
     // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-screen
@@ -101,7 +112,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             if (plane.trackingState == TrackingState.TRACKING && plane.anchors.size < maxPortalCountPerPlane) {
                 val hitTest = frame.hitTest(frame.screenCenter().x, frame.screenCenter().y)
                 if (hitTest.isNotEmpty()) {
-                    val hitResult = hitTest.iterator().next()
+                    val hitResult = hitTest.last()
                     val portalAnchor = plane.createAnchor(hitResult.hitPose)
                     addModelToScene(portalModel, portalAnchor)
                     portalCount += 1
