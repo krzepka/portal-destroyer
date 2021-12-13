@@ -27,8 +27,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private val scene get() = arSceneView.scene
     private val camera get() = scene.camera
 
-    private val ballAsset: String = "https://drive.google.com/uc?export=download&id=1Stbo-zW3crIAzT4LTPOFt3YIuuZVeOsB"
-    private val portalAsset: String = "https://drive.google.com/uc?export=download&id=1IeCl7_idk_HwzWL62j9mMIRzpdA-qT-h"
+    private val ballAsset: String = getString(R.string.ballAssetUrl)
+    private val portalAsset: String = getString(R.string.portalAssetUrl)
 
     private var portalModel : Renderable? = null
     private var ballModel: Renderable? = null
@@ -64,6 +64,9 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         // Stop when no frame
         val frame: Frame = arSceneView.arFrame ?: return
+        val p = frame.androidSensorPose
+        val x = frame.lightEstimate
+        frame.acquireCameraImage()
 
         // Ensure the camera is tracking to avoid errors
         if(frame.camera.trackingState == TrackingState.TRACKING){

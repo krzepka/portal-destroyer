@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">PortalDestroyer</string>
-    <string name="test_text">Test text</string>
-    <string name="test_description">Test description</string>
+    <string name="portalAssetUrl"><![CDATA[https://drive.google.com/uc?export=download&id=1IeCl7_idk_HwzWL62j9mMIRzpdA-qT-h]]></string>
+    <string name="ballAssetUrl"><![CDATA[https://drive.google.com/uc?export=download&id=1Stbo-zW3crIAzT4LTPOFt3YIuuZVeOsB]]></string>
 </resources>
