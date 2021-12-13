@@ -14,8 +14,7 @@ import com.google.ar.sceneform.FrameTime
 import com.google.ar.sceneform.Node
 import com.google.ar.sceneform.SceneView
 import com.google.ar.sceneform.math.Vector3
-import com.google.ar.sceneform.rendering.ModelRenderable
-import com.google.ar.sceneform.rendering.Renderable
+import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
 import com.gorisse.thomas.sceneform.scene.await
 
@@ -41,7 +40,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-
         arFragment = (childFragmentManager.findFragmentById(R.id.arFragment) as ArFragment).apply {
             setOnSessionConfigurationListener { _, _ ->
                 // Modify the AR session configuration here
@@ -65,6 +63,25 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         portalAsset = getString(R.string.ballAssetUrl)
     }
 
+    private suspend fun loadModels() {
+        createCylinder(Color(0.0f,0.0f,255.0f ))
+        ballModel = ModelRenderable.builder()
+            .setSource(context, Uri.parse(ballAsset))
+            .setIsFilamentGltf(true)
+            .await()
+//        portalModel = ModelRenderable.builder()
+//            .setSource(context, Uri.parse(portalAsset))
+//            .setIsFilamentGltf(true)
+//            .await()
+    }
+
+    private fun createCylinder(color: Color){
+        MaterialFactory.makeOpaqueWithColor(arFragment.context, color)
+            .thenAccept {
+                portalModel =  ShapeFactory.makeCylinder(2.0f, 0.1f, Vector3(0.0f, 0.0f, 0.0f), it)
+            }
+    }
+
     private fun sceneUpdate(updatedTime: FrameTime){
         // Let the fragment update its state first
         arFragment.onUpdate(updatedTime)
@@ -83,10 +100,29 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     private fun placePortalsOnNewPlanes(frame: Frame) {
+        val color: Color = getColorByEstimatePixelIntensity(frame.lightEstimate.pixelIntensity)
         if (portalCount < maxPortalCount) {
             val planes = frame.getUpdatedTrackables(Plane::class.java)
-            putPortalOnPlane(planes, frame)
+            putPortalOnPlane(planes, frame, color)
         }
+    }
+
+    private fun getColorByEstimatePixelIntensity(intensity: Float): Color {
+        val color: Color = when {
+            intensity < 50 -> {
+                Color(100.0f, 100.0f, 0.0f)
+            }
+            intensity < 100 -> {
+                Color(200.0f, 100.0f, 0.0f)
+            }
+            intensity < 150 -> {
+                Color(200.0f, 100.0f, 100.0f)
+            }
+            else -> {
+                Color(200.0f, 200.0f, 200.0f)
+            }
+        }
+        return color
     }
 
     private fun placeBallModelOnStart() {
@@ -102,7 +138,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-screen
     private fun putPortalOnPlane(
         planes: MutableCollection<Plane>,
-        frame: Frame
+        frame: Frame,
+        color: Color
     ) {
         if (portalModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
@@ -114,7 +151,10 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 if (hitTest.isNotEmpty()) {
                     val hitResult = hitTest.last()
                     val portalAnchor = plane.createAnchor(hitResult.hitPose)
-                    addModelToScene(portalModel, portalAnchor)
+
+                    val newRenderable = getRenderableWithNewColor(portalModel, color)
+                    addModelToScene(newRenderable, portalAnchor)
+
                     portalCount += 1
                 }
             }
@@ -134,17 +174,9 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-    private suspend fun loadModels() {
-        ballModel = ModelRenderable.builder()
-            .setSource(context, Uri.parse(ballAsset))
-            .setIsFilamentGltf(true)
-            .await()
-        portalModel = ModelRenderable.builder()
-            .setSource(context, Uri.parse(portalAsset))
-            .setIsFilamentGltf(true)
-            .await()
 
-    }
+
+
 
     @Suppress("UNUSED_PARAMETER")
     private fun onTapPlane(hitResult: HitResult, plane: Plane, motionEvent: MotionEvent) {
@@ -154,16 +186,25 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
 
         // Create the Anchor on a tap position
-        addModelToScene(portalModel, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
+        val newRenderable = getRenderableWithNewColor(portalModel, Color(255.0f, 0.0f, 0.0f))
+        addModelToScene(newRenderable, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
+    }
+
+    private fun getRenderableWithNewColor(renderable: Renderable?, newColor: Color): Renderable? {
+        val newRenderable = renderable?.makeCopy()
+        newRenderable?.material?.setFloat3("color", newColor)
+        return newRenderable
     }
 
     private fun addModelToScene(model: Renderable?, anchor: Anchor?, scale: Vector3 = Vector3(0.05f, 0.05f, 0.05f)) {
+
         scene.addChild(AnchorNode(anchor).apply {
             // Create the transformable model and add it to the anchor.
             addChild(Node().apply {
                 localScale = scale
                 renderable = model
                 renderableInstance.animate(true).start()
+
             })
         })
     }
@@ -177,5 +218,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 renderableInstance.animate(true).start()
             })
     }
+
 
 }
