@@ -91,14 +91,23 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     private fun placePortalsOnNewPlanes(frame: Frame) {
-        val color: Color = selectPortalColorUsingFrame(frame)
         if (portalCount < maxPortalCount) {
             val planes = frame.getUpdatedTrackables(Plane::class.java)
-            putPortalOnPlane(planes, frame, color)
+            putPortalOnPlane(planes, frame)
         }
     }
 
-    private fun selectPortalColorUsingFrame(frame: Frame): Color {
+    private fun selectPortalColorUsingFrame(frame: Frame, pose: Pose): Color {
+        val image = frame.acquireCameraImage()
+        // image.format == ImageFormat.YUV_420_888, so:
+        val y = image.planes[0].buffer
+        val u = image.planes[1].buffer
+        val v = image.planes[2].buffer
+        // https://stackoverflow.com/questions/52726002/camera2-captured-picture-conversion-from-yuv-420-888-to-nv21/52740776#52740776
+        // https://stackoverflow.com/questions/40090681/android-camera2-api-yuv-420-888-to-jpeg
+        // https://developer.android.com/reference/android/media/Image.Plane
+
+        image.close()
         return Color(0f, 0f, 255f)
     }
 
@@ -115,8 +124,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-creen
     private fun putPortalOnPlane(
         planes: MutableCollection<Plane>,
-        frame: Frame,
-        color: Color
+        frame: Frame
     ) {
         if (portalModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
@@ -128,6 +136,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 if (hitTest.isNotEmpty()) {
                     val hitResult = hitTest.last()
                     val portalAnchor = plane.createAnchor(hitResult.hitPose)
+
+                    val color: Color = selectPortalColorUsingFrame(frame, hitResult.hitPose)
 
                     val newRenderable = getRenderableWithNewColor(portalModel, color)
                     addModelToScene(newRenderable, portalAnchor)
