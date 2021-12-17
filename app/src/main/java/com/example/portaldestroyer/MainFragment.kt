@@ -42,6 +42,9 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
             setOnViewCreatedListener { arSceneView ->
                 arSceneView.setFrameRateFactor(SceneView.FrameRate.FULL)
+                // change to false on deploy
+                arSceneView.planeRenderer.isVisible = true
+
             }
             setOnTapArPlaneListener(::onTapPlane)
 
