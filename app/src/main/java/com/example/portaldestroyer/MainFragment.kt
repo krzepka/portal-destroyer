@@ -83,7 +83,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         // Stop when no frame
         val frame: Frame = arSceneView.arFrame ?: return
-        Log.i("sceneUpdate", "Intensity: " + frame.lightEstimate.pixelIntensity)
 
         // Ensure the camera is tracking to avoid errors
         if (frame.camera.trackingState == TrackingState.TRACKING) {
