@@ -9,10 +9,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.ar.core.*
-import com.google.ar.sceneform.AnchorNode
-import com.google.ar.sceneform.FrameTime
-import com.google.ar.sceneform.Node
-import com.google.ar.sceneform.SceneView
+import com.google.ar.sceneform.*
 import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
@@ -90,7 +87,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             placePortalsOnNewPlanes(frame)
         }
 
-
         logCamChildPositions()
     }
 
@@ -116,7 +112,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-    // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-screen
+    // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-creen
     private fun putPortalOnPlane(
         planes: MutableCollection<Plane>,
         frame: Frame,
@@ -199,8 +195,15 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             localScale = scale
             renderable = model
             renderableInstance.animate(true).start()
+            setOnTouchListener { hitTestResult, motionEvent ->
+                if (motionEvent.action == MotionEvent.ACTION_DOWN || motionEvent.action == MotionEvent.ACTION_MOVE) {
+                    val screenHitPointRay = camera.screenPointToRay(motionEvent.x, motionEvent.y)
+                    val rayToLocal = camera.worldToLocalPoint(screenHitPointRay.origin)
+                    localPosition = Vector3(rayToLocal.x*100, rayToLocal.y*100, -1f)
+                }
+
+                return@setOnTouchListener true
+            }
         })
     }
-
-
 }
