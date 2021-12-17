@@ -87,7 +87,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             placePortalsOnNewPlanes(frame)
         }
 
-        logCamChildPositions()
+//        logCamChildPositions()
     }
 
     private fun placePortalsOnNewPlanes(frame: Frame) {
