@@ -16,7 +16,6 @@ import com.google.ar.sceneform.SceneView
 import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
-import com.gorisse.thomas.sceneform.light.ambientIntensityEnvironmentLights
 import com.gorisse.thomas.sceneform.scene.await
 
 
@@ -43,8 +42,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         arFragment = (childFragmentManager.findFragmentById(R.id.arFragment) as ArFragment).apply {
             setOnSessionConfigurationListener { session, config ->
-                // https://developers.google.com/sceneform/develop/lighting-estimation
-                config.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
             }
             setOnViewCreatedListener { arSceneView ->
                 arSceneView.setFrameRateFactor(SceneView.FrameRate.FULL)
@@ -99,29 +96,15 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     private fun placePortalsOnNewPlanes(frame: Frame) {
-        val color: Color = getColorByEstimatePixelIntensity(frame.lightEstimate.pixelIntensity)
+        val color: Color = selectPortalColorUsingFrame(frame)
         if (portalCount < maxPortalCount) {
             val planes = frame.getUpdatedTrackables(Plane::class.java)
             putPortalOnPlane(planes, frame, color)
         }
     }
 
-    private fun getColorByEstimatePixelIntensity(intensity: Float): Color {
-        val color: Color = when {
-            intensity < 0.1f -> {
-                Color(200.0f, 200.0f, 200.0f)
-            }
-            intensity < 0.2f -> {
-                Color(200.0f, 100.0f, 100.0f)
-            }
-            intensity < 0.5f -> {
-                Color(200.0f, 100.0f, 0.0f)
-            }
-            else -> {
-                Color(100.0f, 100.0f, 0.0f)
-            }
-        }
-        return color
+    private fun selectPortalColorUsingFrame(frame: Frame): Color {
+        return Color(0f, 0f, 255f)
     }
 
     private fun placeBallModelOnStart() {
