@@ -59,7 +59,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     private fun loadStringAssets() {
         ballAsset = getString(R.string.ballAssetUrl)
-        portalAsset = getString(R.string.ballAssetUrl)
+        portalAsset = getString(R.string.portalAssetUrl)
     }
 
     private suspend fun loadModels() {
