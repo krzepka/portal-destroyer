@@ -139,8 +139,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 if (hitTest.isNotEmpty()) {
                     val hitResult = hitTest.last()
                     val portalAnchor = plane.createAnchor(hitResult.hitPose)
-
-                    val color: Color = selectPortalColorUsingFrame(frame, hitResult.hitPose)
+//                    val color: Color = selectPortalColorUsingFrame(frame, hitResult.hitPose)
+                    val color = Color(0f,0f,255f)
 
                     val newRenderable = getRenderableWithNewColor(portalModel, color)
                     addModelToScene(newRenderable, portalAnchor)
@@ -194,6 +194,14 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 localScale = scale
                 renderable = model
                 renderableInstance.animate(true).start()
+                setOnTouchListener { hitTestResult, motionEvent ->
+                    arFragment.onPeekTouch(hitTestResult, motionEvent);
+                    if (hitTestResult.node != null) {
+                        val hitNode = hitTestResult.node
+                        hitNode?.parent = null
+                    }
+                    return@setOnTouchListener true
+                }
             })
         })
     }
@@ -217,7 +225,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 else if(motionEvent.action == MotionEvent.ACTION_UP){
                     localPosition = Vector3(0f, -0.4f, -1f)
                 }
-
                 return@setOnTouchListener true
             }
         })
