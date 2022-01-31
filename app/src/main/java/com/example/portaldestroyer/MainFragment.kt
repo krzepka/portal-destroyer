@@ -52,7 +52,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         lifecycleScope.launchWhenCreated {
             loadStringAssets()
-            loadModels()
+//            loadModels()
             arFragment.arSceneView.scene.addOnUpdateListener(::sceneUpdate)
         }
     }
@@ -139,7 +139,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 if (hitTest.isNotEmpty()) {
                     val hitResult = hitTest.last()
                     val portalAnchor = plane.createAnchor(hitResult.hitPose)
-
                     val color: Color = selectPortalColorUsingFrame(frame, hitResult.hitPose)
 
                     val newRenderable = getRenderableWithNewColor(portalModel, color)
@@ -182,6 +181,20 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         newRenderable?.material?.setFloat3("color", newColor)
         return newRenderable
     }
+    private fun removeAnchorNode(nodeToremove: AnchorNode) {
+        // Based on:
+        // https://stackoverflow.com/questions/58124052/how-to-remove-3d-objects-which-are-placed-on-ar-screen
+        var nodeToremove: AnchorNode? = nodeToremove
+        if (nodeToremove != null) {
+            arFragment.arSceneView.scene.removeChild(nodeToremove)
+//            anchorNodeList.remove(nodeToremove)
+            nodeToremove.anchor!!.detach()
+            nodeToremove.parent = null
+            nodeToremove = null
+        } else {
+            // no anchor intersecting with a touch
+        }
+    }
 
     private fun addModelToScene(
         model: Renderable?,
@@ -194,6 +207,20 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 localScale = scale
                 renderable = model
                 renderableInstance.animate(true).start()
+                setOnTouchListener { hitTestResult, motionEvent ->
+
+                    Log.d("PORTAL_TOUCHED","handleOnTouch");
+                    // First call ArFragment's listener to handle TransformableNodes.
+                    arFragment.onPeekTouch(hitTestResult, motionEvent);
+                    // Check for touching a Sceneform node
+                    if (hitTestResult.node != null) {
+                        Log.d("PORTAL_TOUCHED", "handleOnTouch hitTestResult.getNode() != null")
+                        val hitNode = hitTestResult.node
+                        removeAnchorNode(hitNode as AnchorNode)
+                    }
+
+                    return@setOnTouchListener true
+                }
             })
         })
     }
