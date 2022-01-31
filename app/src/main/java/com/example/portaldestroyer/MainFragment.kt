@@ -225,7 +225,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 else if(motionEvent.action == MotionEvent.ACTION_UP){
                     localPosition = Vector3(0f, -0.4f, -1f)
                 }
-
                 return@setOnTouchListener true
             }
         })
