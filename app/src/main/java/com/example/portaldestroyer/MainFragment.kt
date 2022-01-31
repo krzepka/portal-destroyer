@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -14,6 +15,7 @@ import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
 import com.gorisse.thomas.sceneform.scene.await
+import org.w3c.dom.Text
 
 
 class MainFragment : Fragment(R.layout.fragment_main) {
@@ -35,6 +37,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private val maxPortalCountPerPlane: Int = 2
 
     private var destroyedPortalCount = 0
+    private lateinit var textViewScoreInt: TextView
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -55,6 +58,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         lifecycleScope.launchWhenCreated {
             loadStringAssets()
             loadModels()
+            textViewScoreInt = view.findViewById(R.id.textViewScoreInt)
             arFragment.arSceneView.scene.addOnUpdateListener(::sceneUpdate)
         }
     }
@@ -92,7 +96,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             placePortalsOnNewPlanes(frame)
         }
 
-//        logCamChildPositions()
+        // display current score
+        textViewScoreInt.text = destroyedPortalCount.toString()
     }
 
     private fun placePortalsOnNewPlanes(frame: Frame) {
