@@ -34,6 +34,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private val maxPortalCount = 20
     private val maxPortalCountPerPlane: Int = 2
 
+    private var destroyedPortalCount = 0
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -199,6 +201,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                     if (hitTestResult.node != null) {
                         val hitNode = hitTestResult.node
                         hitNode?.parent = null
+                        destroyedPortalCount += 1
+                        Log.d("portalTouched", "Destroyed portal count: $destroyedPortalCount")
                     }
                     return@setOnTouchListener true
                 }
