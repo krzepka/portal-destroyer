@@ -9,6 +9,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import android.graphics.Bitmap
+import android.os.Build
+import androidx.annotation.RequiresApi
+import com.example.android.camera.utils.YuvToRgbConverter
 import com.google.ar.core.*
 import com.google.ar.sceneform.*
 import com.google.ar.sceneform.math.Vector3
@@ -16,7 +20,6 @@ import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
 import com.gorisse.thomas.sceneform.scene.await
 import org.w3c.dom.Text
-
 
 class MainFragment : Fragment(R.layout.fragment_main) {
 
@@ -52,7 +55,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
             }
             setOnTapArPlaneListener(::onTapPlane)
-
         }
 
         lifecycleScope.launchWhenCreated {
@@ -93,6 +95,9 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         // Ensure the camera is tracking to avoid errors
         if (frame.camera.trackingState == TrackingState.TRACKING) {
             placeBallModelOnStart()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                selectPortalColorUsingFrame(frame, 0, 0)
+            }
             placePortalsOnNewPlanes(frame)
         }
 
@@ -107,25 +112,24 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-    private fun selectPortalColorUsingFrame(frame: Frame, pose: Pose): Color {
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun selectPortalColorUsingFrame(frame: Frame, x: Int, y: Int): android.graphics.Color {
         val image = frame.acquireCameraImage()
         // image.format == ImageFormat.YUV_420_888, so:
-        val y = image.planes[0].buffer
-        val u = image.planes[1].buffer
-        val v = image.planes[2].buffer
-        // https://stackoverflow.com/questions/52726002/camera2-captured-picture-conversion-from-yuv-420-888-to-nv21/52740776#52740776
-        // https://stackoverflow.com/questions/40090681/android-camera2-api-yuv-420-888-to-jpeg
-        // https://developer.android.com/reference/android/media/Image.Plane
+        val yuvToRgbConverter = YuvToRgbConverter(requireContext())
+        val bmp = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+        yuvToRgbConverter.yuvToRgb(image, bmp)
 
+        val rgb_color = bmp.getColor(x, y)
+        Log.d("Color on screen", rgb_color.toString())
         image.close()
-        return Color(0f, 0f, 255f)
+        return rgb_color
     }
 
     private fun placeBallModelOnStart() {
         if (ballModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
         } else if (!ballModelPlaced) {
-
             attachModelToCamera(ballModel, Vector3(0.1f, 0.1f, 0.1f))
             ballModelPlaced = true
         }
