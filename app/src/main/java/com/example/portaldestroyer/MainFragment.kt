@@ -1,5 +1,6 @@
 package com.example.portaldestroyer
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -10,6 +11,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import android.graphics.Bitmap
+import android.media.Image
 import android.os.Build
 import androidx.annotation.RequiresApi
 import com.example.android.camera.utils.YuvToRgbConverter
@@ -85,6 +87,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
     }
 
+    @SuppressLint("NewApi")
     private fun sceneUpdate(updatedTime: FrameTime) {
         // Let the fragment update its state first
         arFragment.onUpdate(updatedTime)
@@ -96,7 +99,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         if (frame.camera.trackingState == TrackingState.TRACKING) {
             placeBallModelOnStart()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                selectPortalColorUsingFrame(frame, 0, 0)
+                val image = frame.acquireCameraImage()
+                selectPortalColorUsingFrame(image, 0, 0)
             }
             placePortalsOnNewPlanes(frame)
         }
@@ -105,6 +109,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         textViewScoreInt.text = destroyedPortalCount.toString()
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun placePortalsOnNewPlanes(frame: Frame) {
         if (portalCount < maxPortalCount) {
             val planes = frame.getUpdatedTrackables(Plane::class.java)
@@ -112,14 +117,14 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun selectPortalColorUsingFrame(frame: Frame, x: Int, y: Int): android.graphics.Color {
-        val image = frame.acquireCameraImage()
+    @SuppressLint("NewApi")
+    private fun selectPortalColorUsingFrame(image: Image, x: Int, y: Int): android.graphics.Color {
         // image.format == ImageFormat.YUV_420_888, so:
         val yuvToRgbConverter = YuvToRgbConverter(requireContext())
         val bmp = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
         yuvToRgbConverter.yuvToRgb(image, bmp)
 
+        Log.d("selectPortalColor", "X=$x, Y=$y")
         val rgb_color = bmp.getColor(x, y)
         Log.d("Color on screen", rgb_color.toString())
         image.close()
@@ -136,6 +141,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     }
 
     // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-creen
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun putPortalOnPlane(
         planes: MutableCollection<Plane>,
         frame: Frame
@@ -150,10 +156,12 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 if (hitTest.isNotEmpty()) {
                     val hitResult = hitTest.last()
                     val portalAnchor = plane.createAnchor(hitResult.hitPose)
-//                    val color: Color = selectPortalColorUsingFrame(frame, hitResult.hitPose)
-                    val color = Color(0f,0f,255f)
+                    val image = frame.acquireCameraImage()
+                    val color = selectPortalColorUsingFrame(image, image.width/2, image.height/2)
+                    // convert Color object
+                    val sceneformColor = Color(color.toArgb())
 
-                    val newRenderable = getRenderableWithNewColor(portalModel, color)
+                    val newRenderable = getRenderableWithNewColor(portalModel, sceneformColor)
                     addModelToScene(newRenderable, portalAnchor)
 
                     portalCount += 1
@@ -211,6 +219,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                         val hitNode = hitTestResult.node
                         hitNode?.parent = null
                         destroyedPortalCount += 1
+                        portalCount -= 1
                         Log.d("portalTouched", "Destroyed portal count: $destroyedPortalCount")
                     }
                     return@setOnTouchListener true
