@@ -22,6 +22,8 @@ import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
 import com.gorisse.thomas.sceneform.scene.await
 import org.w3c.dom.Text
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 
 class MainFragment : Fragment(R.layout.fragment_main) {
 
@@ -43,6 +45,9 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     private var destroyedPortalCount = 0
     private lateinit var textViewScoreInt: TextView
+
+    private var lastPlaneCreatedTimestamp: Long = 0  // in nanoseconds
+    private var maxTimeBetweenPlaneCreation = 0.1 * 1000000000  // in nanoseconds
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -149,22 +154,27 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         if (portalModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
         }
+        if(planes.isEmpty()){
+            Log.d("putPortalOnPlane","updatetrackables returned 0 planes")
+        }
 
         for (plane in planes) {
             if (plane.trackingState == TrackingState.TRACKING && plane.anchors.size < maxPortalCountPerPlane) {
                 val hitTest = frame.hitTest(frame.screenCenter().x, frame.screenCenter().y)
                 if (hitTest.isNotEmpty()) {
-                    val hitResult = hitTest.last()
-                    val portalAnchor = plane.createAnchor(hitResult.hitPose)
-                    val image = frame.acquireCameraImage()
-                    val color = selectPortalColorUsingFrame(image, image.width/2, image.height/2)
-                    // convert Color object
-                    val sceneformColor = Color(color.toArgb())
-
-                    val newRenderable = getRenderableWithNewColor(portalModel, sceneformColor)
-                    addModelToScene(newRenderable, portalAnchor)
-
-                    portalCount += 1
+                    val newTimestamp = frame.timestamp
+                    if(newTimestamp - lastPlaneCreatedTimestamp > maxTimeBetweenPlaneCreation){
+                        val hitResult = hitTest.last()
+                        val portalAnchor = plane.createAnchor(hitResult.hitPose)
+                        val image = frame.acquireCameraImage()
+                        val color = selectPortalColorUsingFrame(image, image.width/2, image.height/2)
+                        // convert Color object
+                        val sceneformColor = Color(color.toArgb())
+                        val newRenderable = getRenderableWithNewColor(portalModel, sceneformColor)
+                        addModelToScene(newRenderable, portalAnchor)
+                        portalCount += 1
+                    }
+                    lastPlaneCreatedTimestamp = newTimestamp
                 }
             }
         }
@@ -192,8 +202,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
 
         // Create the Anchor on a tap position
-        val newRenderable = getRenderableWithNewColor(portalModel, Color(255.0f, 0.0f, 0.0f))
-        addModelToScene(newRenderable, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
+//        val newRenderable = getRenderableWithNewColor(portalModel, Color(255.0f, 0.0f, 0.0f))
+//        addModelToScene(newRenderable, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
     }
 
     private fun getRenderableWithNewColor(renderable: Renderable?, newColor: Color): Renderable? {
