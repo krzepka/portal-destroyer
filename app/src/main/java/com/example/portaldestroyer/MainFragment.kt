@@ -1,5 +1,6 @@
 package com.example.portaldestroyer
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -9,6 +10,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import android.graphics.Bitmap
+import android.media.Image
+import android.os.Build
+import androidx.annotation.RequiresApi
+import com.example.android.camera.utils.YuvToRgbConverter
 import com.google.ar.core.*
 import com.google.ar.sceneform.*
 import com.google.ar.sceneform.math.Vector3
@@ -16,7 +22,8 @@ import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
 import com.gorisse.thomas.sceneform.scene.await
 import org.w3c.dom.Text
-
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 
 class MainFragment : Fragment(R.layout.fragment_main) {
 
@@ -39,6 +46,9 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private var destroyedPortalCount = 0
     private lateinit var textViewScoreInt: TextView
 
+    private var lastPlaneCreatedTimestamp: Long = 0  // in nanoseconds
+    private var maxTimeBetweenPlaneCreation = 0.1 * 1000000000  // in nanoseconds
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -52,7 +62,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
             }
             setOnTapArPlaneListener(::onTapPlane)
-
         }
 
         lifecycleScope.launchWhenCreated {
@@ -65,7 +74,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     private fun loadStringAssets() {
         ballAsset = getString(R.string.ballAssetUrl)
-        portalAsset = getString(R.string.ballAssetUrl)
+        portalAsset = getString(R.string.portalAssetUrl)
     }
 
     private suspend fun loadModels() {
@@ -83,6 +92,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
     }
 
+    @SuppressLint("NewApi")
     private fun sceneUpdate(updatedTime: FrameTime) {
         // Let the fragment update its state first
         arFragment.onUpdate(updatedTime)
@@ -93,6 +103,10 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         // Ensure the camera is tracking to avoid errors
         if (frame.camera.trackingState == TrackingState.TRACKING) {
             placeBallModelOnStart()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val image = frame.acquireCameraImage()
+                selectPortalColorUsingFrame(image, 0, 0)
+            }
             placePortalsOnNewPlanes(frame)
         }
 
@@ -100,6 +114,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         textViewScoreInt.text = destroyedPortalCount.toString()
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun placePortalsOnNewPlanes(frame: Frame) {
         if (portalCount < maxPortalCount) {
             val planes = frame.getUpdatedTrackables(Plane::class.java)
@@ -107,31 +122,31 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-    private fun selectPortalColorUsingFrame(frame: Frame, pose: Pose): Color {
-        val image = frame.acquireCameraImage()
+    @SuppressLint("NewApi")
+    private fun selectPortalColorUsingFrame(image: Image, x: Int, y: Int): android.graphics.Color {
         // image.format == ImageFormat.YUV_420_888, so:
-        val y = image.planes[0].buffer
-        val u = image.planes[1].buffer
-        val v = image.planes[2].buffer
-        // https://stackoverflow.com/questions/52726002/camera2-captured-picture-conversion-from-yuv-420-888-to-nv21/52740776#52740776
-        // https://stackoverflow.com/questions/40090681/android-camera2-api-yuv-420-888-to-jpeg
-        // https://developer.android.com/reference/android/media/Image.Plane
+        val yuvToRgbConverter = YuvToRgbConverter(requireContext())
+        val bmp = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+        yuvToRgbConverter.yuvToRgb(image, bmp)
 
+        Log.d("selectPortalColor", "X=$x, Y=$y")
+        val rgb_color = bmp.getColor(x, y)
+        Log.d("Color on screen", rgb_color.toString())
         image.close()
-        return Color(0f, 0f, 255f)
+        return rgb_color
     }
 
     private fun placeBallModelOnStart() {
         if (ballModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
         } else if (!ballModelPlaced) {
-
             attachModelToCamera(ballModel, Vector3(0.1f, 0.1f, 0.1f))
             ballModelPlaced = true
         }
     }
 
     // https://stackoverflow.com/questions/51673733/how-to-place-a-object-without-tapping-on-the-creen
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun putPortalOnPlane(
         planes: MutableCollection<Plane>,
         frame: Frame
@@ -139,20 +154,27 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         if (portalModel == null) {
             Toast.makeText(context, "Loading...", Toast.LENGTH_SHORT).show()
         }
+        if(planes.isEmpty()){
+            Log.d("putPortalOnPlane","updatetrackables returned 0 planes")
+        }
 
         for (plane in planes) {
             if (plane.trackingState == TrackingState.TRACKING && plane.anchors.size < maxPortalCountPerPlane) {
                 val hitTest = frame.hitTest(frame.screenCenter().x, frame.screenCenter().y)
                 if (hitTest.isNotEmpty()) {
-                    val hitResult = hitTest.last()
-                    val portalAnchor = plane.createAnchor(hitResult.hitPose)
-//                    val color: Color = selectPortalColorUsingFrame(frame, hitResult.hitPose)
-                    val color = Color(0f,0f,255f)
-
-                    val newRenderable = getRenderableWithNewColor(portalModel, color)
-                    addModelToScene(newRenderable, portalAnchor)
-
-                    portalCount += 1
+                    val newTimestamp = frame.timestamp
+                    if(newTimestamp - lastPlaneCreatedTimestamp > maxTimeBetweenPlaneCreation){
+                        val hitResult = hitTest.last()
+                        val portalAnchor = plane.createAnchor(hitResult.hitPose)
+                        val image = frame.acquireCameraImage()
+                        val color = selectPortalColorUsingFrame(image, image.width/2, image.height/2)
+                        // convert Color object
+                        val sceneformColor = Color(color.toArgb())
+                        val newRenderable = getRenderableWithNewColor(portalModel, sceneformColor)
+                        addModelToScene(newRenderable, portalAnchor)
+                        portalCount += 1
+                    }
+                    lastPlaneCreatedTimestamp = newTimestamp
                 }
             }
         }
@@ -180,8 +202,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
 
         // Create the Anchor on a tap position
-        val newRenderable = getRenderableWithNewColor(portalModel, Color(255.0f, 0.0f, 0.0f))
-        addModelToScene(newRenderable, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
+//        val newRenderable = getRenderableWithNewColor(portalModel, Color(255.0f, 0.0f, 0.0f))
+//        addModelToScene(newRenderable, hitResult.createAnchor(), Vector3(0.05f, 0.05f, 0.05f))
     }
 
     private fun getRenderableWithNewColor(renderable: Renderable?, newColor: Color): Renderable? {
@@ -207,6 +229,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                         val hitNode = hitTestResult.node
                         hitNode?.parent = null
                         destroyedPortalCount += 1
+                        portalCount -= 1
                         Log.d("portalTouched", "Destroyed portal count: $destroyedPortalCount")
                     }
                     return@setOnTouchListener true
